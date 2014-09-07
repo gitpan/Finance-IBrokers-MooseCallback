@@ -2,6 +2,7 @@ package Finance::IBrokers::MooseCallback;
 
 use 5.006;
 use strict;
+
 #use warnings FATAL => 'all';
 use warnings;
 
@@ -15,8 +16,7 @@ Version 0.01
 
 =cut
 
-our $VERSION = '0.01';
-
+our $VERSION = '0.02';
 
 =head1 SYNOPSIS
 
@@ -28,6 +28,7 @@ I wrote for my own purposes. You will likely want to override it with your own m
 
 Using this module is very similar to the sample described within Finance::InteractiveBrokers::TWS
 
+    use Finance::InteractiveBrokers;
     use Finance::IBrokers::MooseCallback;
 
     my $callback = Finance::IBrokers::MooseCallback->new(debug => 1);
@@ -61,12 +62,6 @@ Using this module is very similar to the sample described within Finance::Intera
 
     warn Dumper( $callback->contractDetailsRequest);
     
-
-=head1 EXPORT
-
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
-
 =head1 SUBROUTINES/METHODS
 =cut 
 
@@ -84,13 +79,15 @@ class Finance::IBrokers::MooseCallback {
       qw(Contract Order OrderState ContractDetails Execution boolean long UnderComp);
 
 =head2 NextID
-   Stores the NextID value to use when placing an order. It is initialized by TWS at startup, then incremented with getNextID.
+   - Stores the NextID value to use when placing an order. It is initialized by TWS at startup, then incremented with getNextID.
+
 =cut
 
     has 'NextID' => ( is => 'rw', isa => Int, default => -1 );
 
 =head2 contracts
-    Stores the an array of Finance::InteractiveBrokers::TWS::com::ib::client::ContractDetails objects.
+    - Stores the an array of Finance::InteractiveBrokers::TWS::com::ib::client::ContractDetails objects in the contractDetails method.
+
 =cut
 
     has 'contracts' => (
@@ -119,9 +116,15 @@ class Finance::IBrokers::MooseCallback {
 
 =head2 debug
     Set debug to 1 to enable more warn output 
+
 =cut
 
     has 'debug' => ( is => 'rw', isa => boolean, default => 0 );
+
+=head2 contractDetailsRequest
+    - Stores a hash of values describing the contract details request status.
+
+=cut
 
     has 'contractDetailsRequest' => (
         is      => 'rw',
@@ -138,6 +141,11 @@ class Finance::IBrokers::MooseCallback {
         },
     );
 
+=head2 accountinfo
+    - Stores the a hash of account information key=>value pairs.
+
+=cut
+
     has 'accountinfo' => (
         is      => 'rw',
         isa     => HashRef,
@@ -152,6 +160,11 @@ class Finance::IBrokers::MooseCallback {
             accountinfo_pairs  => 'kv',
         },
     );
+
+=head2 DataReq
+    - Storage for data requests to be made.
+
+=cut
 
     has 'DataReq' => (
         is      => 'rw',
@@ -168,10 +181,15 @@ class Finance::IBrokers::MooseCallback {
         },
     );
 
+=head2 candles
+    - Storage for OHLC candles
+
+=cut
+
     has 'candles' => (
-	is => 'rw', 
-	isa => 'HashRef',
-	traits  => ['Hash'],
+        is      => 'rw',
+        isa     => 'HashRef',
+        traits  => ['Hash'],
         default => sub { {} },
         handles => {
             set_candle    => 'set',
@@ -182,12 +200,22 @@ class Finance::IBrokers::MooseCallback {
             candle_pairs  => 'kv',
         },
 
-	 );
+    );
+
+=head2 nextValidId
+    - Called at startup, then when getNextID is used. Sets the next ID for TWS orders.
+
+=cut
 
     method nextValidId( Int $orderId) {
         $self->NextID($orderId);
           warn "nextValidId initialized with: $orderId\n" if ( $self->debug );
       }
+
+=head2 getNextID
+    - Return the next order ID currently set NextID and increments the value.
+
+=cut
 
       method getNextID {
         my $nextid = $self->NextID;
@@ -198,24 +226,49 @@ class Finance::IBrokers::MooseCallback {
 
     #method error( Exception e ) {}
 
+=head2 error
+    - Two error methods, since it can be called two different ways.
+    method error( Str $str ) { warn $str if ( $self->debug ); }
+      method error( Int $id, Int $errorCode, Any $errorMsg )
+
+=cut
+
     method error( Str $str ) { warn $str if ( $self->debug ); }
 
       method error( Int $id, Int $errorCode, Any $errorMsg )
       { warn "ERROR: $id, EC: $errorCode, Msg: $errorMsg\n" }
 
+=head2 connectionClosed
+    - Called with the TWS connection is closed. 
+
+=cut
+
       method connectionClosed() { warn "Connection Closed\n" }
+
+=head2 tickPrice
+    - Called when tickPrice changes
+
+=cut
 
       method tickPrice( Int $tickerId, Int $field, Num $price,
         Int $canAutoExecute) {
+
         my $type   = $self->{tickType}->getField($field);
           my $time = Time::HiRes::Value->now();
           my $ae   = $canAutoExecute ? 'canAutoExecute' : 'NoAutoExecute';
+
           warn "TickPrice: $tickerId, $type: $price, $ae, $time \n"
           if ( $self->debug );
 
         }
 
+=head2 tickSize
+    - Called when tickSize changes
+
+=cut
+
       method tickSize( Int $tickerId, Int $field, Int $size ) {
+
         my $type   = $self->{tickType}->getField($field);
           my $time = Time::HiRes::Value->now();
 
@@ -224,11 +277,21 @@ class Finance::IBrokers::MooseCallback {
 
       }
 
+=head2 tickGeneric
+    - Called when market data changes
+
+=cut
+
       method tickGeneric( Int $tickerId, Int $tickType, Num $value ) {
         my $type = $self->{tickType}->getField($tickType);
           warn "tickGeneric: $tickerId, $tickType, $type, $value \n"
           if ( $self->debug );
       }
+
+=head2 Other methods
+    - See the Interactive Brokers API documentation at https://www.interactivebrokers.com/en/software/api/apiguide/java/java_ewrapper_methods.htm for other methods.
+
+=cut
 
       method tickString( Int $tickerId, Int $tickType, Any $value ) {
         my $type = $self->{tickType}->getField($tickType);
@@ -237,7 +300,10 @@ class Finance::IBrokers::MooseCallback {
 
       }
 
-      method tickSnapshotEnd( Int $tickerId) {}
+      method tickSnapshotEnd( Int $tickerId) {
+        warn "tickSnapshotEnd called with Ticker ID: $tickerId\n"
+          if ( $self->debug );
+      }
 
       method tickOptionComputation(
         Int $tickerId,
@@ -372,7 +438,8 @@ class Finance::IBrokers::MooseCallback {
       method contractDetails( Int $reqId, ContractDetails $contractDetails ) {
 
         #print Dumper($contractDetails);
-        $self->add_contract($contractDetails);
+        $self->add_contract($contractDetails)
+          ;    # Add this contract to the ContractDetails array
 
           warn "contractDetails Request ID: $reqId, \n" if ( $self->debug );
 
@@ -637,7 +704,6 @@ class Finance::IBrokers::MooseCallback {
 
 }
 
-
 =head1 AUTHOR
 
 Doug Spencer, C<< <forhire99 at gmail.com> >>
@@ -727,4 +793,4 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =cut
 
-1; # End of Finance::IBrokers::MooseCallback
+1;    # End of Finance::IBrokers::MooseCallback
